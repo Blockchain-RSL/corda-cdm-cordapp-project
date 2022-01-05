@@ -1,0 +1,35 @@
+notary:
+  rpc:
+    host: localhost
+    port: 10003
+    auth:
+      username: user1
+      password: test
+nodeA:
+  rpc:
+    host: localhost
+    port: 10006
+    auth:
+      username: user1
+      password: test
+nodeB:
+  rpc:
+    host: localhost
+    port: 10009
+    auth:
+      username: user1
+      password: test
+nodeC:
+  rpc:
+    host: localhost
+    port: 10012
+    auth:
+      username: user1
+      password: test
+observer:
+  rpc:
+    host: localhost
+    port: 10015
+    auth:
+      username: user1
+      password: test

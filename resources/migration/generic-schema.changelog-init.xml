@@ -1,0 +1,39 @@
+<?xml version="1.1" encoding="UTF-8" standalone="no"?>
+<databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+                   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                   xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.5.xsd">
+    <changeSet author="Andrea Reguzzoni" id="create_cdm_states_table_id">
+        <createTable tableName="cdm_states">
+            <column name="output_index" type="INTEGER">
+                <constraints nullable="false"/>
+            </column>
+            <column name="transaction_id" type="NVARCHAR(144)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="instrumentType" type="NVARCHAR(255)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="instrument" type="NVARCHAR(255)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="quantity" type="NVARCHAR(255)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="price" type="DOUBLE">
+                <constraints nullable="false"/>
+            </column>
+            <column name="currency" type="NVARCHAR(255)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="market" type="NVARCHAR(255)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="linearId" type="NVARCHAR(255)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="tradeStatus" type="NVARCHAR(255)">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+    </changeSet>
+</databaseChangeLog>

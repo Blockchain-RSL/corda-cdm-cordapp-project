@@ -1,0 +1,19 @@
+flow start com.template.flows.ProposalFlow$Initiator counterparty: PartyB, observer: Observer, instrumentType: "exampleInstrumentType", instrument: "instrument", quantity: "100", price: 100.0, currency: "USD", market: "EUROPA"
+
+flow start com.template.flows.AcceptanceFlow$Initiator proposalId: "a8e0c1a3-1513-46aa-b412-6fbbea7cefae", observer: Observer
+
+
+
+drop table cdm_states;
+create table cdm_states (
+	output_index int4,
+	transaction_id varchar(144) NOT NULL,
+	instrumentType varchar(255) NOT NULL,
+	instrument varchar(255) NOT NULL,
+	quantity varchar(255) NOT NULL,
+	price float8,
+	currency varchar(255) NOT NULL,
+	market varchar(255) NOT NULL,
+	linearId uuid NOT NULL,
+	tradeStatus varchar(255) NOT NULL
+);

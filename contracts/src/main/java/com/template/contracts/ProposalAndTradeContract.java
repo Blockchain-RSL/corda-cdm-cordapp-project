@@ -30,6 +30,48 @@ public class ProposalAndTradeContract implements Contract {
                 require.using("The proposee is a required signer", command.getSigners().contains(output.getProposee().getOwningKey()));
                 return null;
             });
+        }else if(command.getValue() instanceof Commands.Modification){
+            requireThat(require -> {
+                require.using("There is exactly one input", tx.getInputStates().size() == 1);
+                require.using("The single input is of type TradeState", tx.inputsOfType(TradeState.class).size() == 1);
+                require.using("There is exactly one output", tx.getOutputs().size() == 1);
+                require.using("The single output is of type TradeState", tx.outputsOfType(TradeState.class).size() == 1);
+                require.using("There is exactly one command", tx.getCommands().size() == 1);
+                require.using("There is no timestamp", tx.getTimeWindow() == null);
+
+                TradeState input = tx.inputsOfType(TradeState.class).get(0);
+                TradeState output = tx.outputsOfType(TradeState.class).get(0);
+
+                require.using("The request must be a proposal", input.getTradeStatus().equals(TradeStatus.PROPOSED));
+
+                require.using("The buyer is unmodified in the output", input.getProposer().equals(output.getProposer()));
+                require.using("The seller is unmodified in the output", input.getProposee().equals(output.getProposee()));
+
+                require.using("The proposer is a required signer", command.getSigners().contains(input.getProposer().getOwningKey()));
+                require.using("The proposee is a required signer", command.getSigners().contains(input.getProposee().getOwningKey()));
+                return null;
+            });
+        }else if(command.getValue() instanceof Commands.Modification){
+            requireThat(require -> {
+                require.using("There is exactly one input", tx.getInputStates().size() == 1);
+                require.using("The single input is of type TradeState", tx.inputsOfType(TradeState.class).size() == 1);
+                require.using("There is exactly one output", tx.getOutputs().size() == 1);
+                require.using("The single output is of type TradeState", tx.outputsOfType(TradeState.class).size() == 1);
+                require.using("There is exactly one command", tx.getCommands().size() == 1);
+                require.using("There is no timestamp", tx.getTimeWindow() == null);
+
+                TradeState input = tx.inputsOfType(TradeState.class).get(0);
+                TradeState output = tx.outputsOfType(TradeState.class).get(0);
+
+                require.using("The request must be a proposal", input.getTradeStatus().equals(TradeStatus.PROPOSED));
+
+                require.using("The buyer is unmodified in the output", input.getProposer().equals(output.getProposer()));
+                require.using("The seller is unmodified in the output", input.getProposee().equals(output.getProposee()));
+
+                require.using("The proposer is a required signer", command.getSigners().contains(input.getProposer().getOwningKey()));
+                require.using("The proposee is a required signer", command.getSigners().contains(input.getProposee().getOwningKey()));
+                return null;
+            });
         }else if(command.getValue() instanceof Commands.Accept){
             requireThat(require -> {
                 require.using("There is exactly one input", tx.getInputStates().size() == 1);
@@ -80,6 +122,7 @@ public class ProposalAndTradeContract implements Contract {
 
     public interface Commands extends CommandData {
         class Propose implements Commands{};
+        class Modification implements Commands{};
         class Accept implements Commands{};
         class Reject implements Commands{};
     }

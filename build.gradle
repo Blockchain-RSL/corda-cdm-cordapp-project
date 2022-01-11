@@ -107,7 +107,7 @@ task deployNodes(type: net.corda.plugins.Cordform, dependsOn: ['jar']) {
     }
     node {
         name "O=Notary,L=Milan,C=IT"
-        notary = [validating : false]
+        notary = [validating : true]
         p2pPort 10002
         rpcSettings {
             address("localhost:10003")
@@ -116,13 +116,13 @@ task deployNodes(type: net.corda.plugins.Cordform, dependsOn: ['jar']) {
         rpcUsers = [[ user: "user1", "password": "test", "permissions": ["ALL"]]]
         extraConfig = [
                 // Setting the H2 address.
-                h2Settings: [ address: 'localhost:12344' ]
-                /*dataSourceProperties: [
+                //h2Settings: [ address: 'localhost:12344' ]
+                dataSourceProperties: [
                         dataSourceClassName : "org.postgresql.ds.PGSimpleDataSource",
                         'dataSource.url' : "jdbc:postgresql://localhost:5432/Notary",
                         'dataSource.user' : "postgres",
                         'dataSource.password' : "postgres"
-                ]*/
+                ]
         ]
     }
     node {
@@ -135,16 +135,13 @@ task deployNodes(type: net.corda.plugins.Cordform, dependsOn: ['jar']) {
         rpcUsers = [[ user: "user1", "password": "test", "permissions": ["ALL"]]]
         extraConfig = [
                 // Setting the H2 address.
-                h2Settings: [ address: 'localhost:12345' ]
-                /*dataSourceProperties: [
+                //h2Settings: [ address: 'localhost:12345' ]
+                dataSourceProperties: [
                         dataSourceClassName : "org.postgresql.ds.PGSimpleDataSource",
-                        'dataSource.url' : "jdbc:postgresql://localhost:5432/NodeA",
+                        'dataSource.url' : "jdbc:postgresql://localhost:5432/PartyA",
                         'dataSource.user' : "postgres",
                         'dataSource.password' : "postgres"
-                ],
-                database: [
-                        transactionIsolationLevel : "READ_COMMITTED"
-                ]*/
+                ]
         ]
     }
     node {
@@ -157,13 +154,13 @@ task deployNodes(type: net.corda.plugins.Cordform, dependsOn: ['jar']) {
         rpcUsers = [[ user: "user1", "password": "test", "permissions": ["ALL"]]]
         extraConfig = [
                 // Setting the H2 address.
-                h2Settings: [ address: 'localhost:12346' ]
-                /*dataSourceProperties: [
+                //h2Settings: [ address: 'localhost:12346' ]
+                dataSourceProperties: [
                         dataSourceClassName : "org.postgresql.ds.PGSimpleDataSource",
-                        'dataSource.url' : "jdbc:postgresql://localhost:5432/NodeB",
+                        'dataSource.url' : "jdbc:postgresql://localhost:5432/PartyB",
                         'dataSource.user' : "postgres",
                         'dataSource.password' : "postgres"
-                ]*/
+                ]
         ]
     }
     node {
@@ -176,13 +173,13 @@ task deployNodes(type: net.corda.plugins.Cordform, dependsOn: ['jar']) {
         rpcUsers = [[ user: "user1", "password": "test", "permissions": ["ALL"]]]
         extraConfig = [
                 // Setting the H2 address.
-                h2Settings: [ address: 'localhost:12347' ]
-                /*dataSourceProperties: [
+                //h2Settings: [ address: 'localhost:12347' ]
+                dataSourceProperties: [
                         dataSourceClassName : "org.postgresql.ds.PGSimpleDataSource",
-                        'dataSource.url' : "jdbc:postgresql://localhost:5432/NodeC",
+                        'dataSource.url' : "jdbc:postgresql://localhost:5432/PartyC",
                         'dataSource.user' : "postgres",
                         'dataSource.password' : "postgres"
-                ]*/
+                ]
         ]
     }
     node {
@@ -195,13 +192,13 @@ task deployNodes(type: net.corda.plugins.Cordform, dependsOn: ['jar']) {
         rpcUsers = [[ user: "user1", "password": "test", "permissions": ["ALL"]]]
         extraConfig = [
                 // Setting the H2 address.
-                h2Settings: [ address: 'localhost:12348' ]
-                /*dataSourceProperties: [
+                //h2Settings: [ address: 'localhost:12348' ]
+                dataSourceProperties: [
                         dataSourceClassName : "org.postgresql.ds.PGSimpleDataSource",
                         'dataSource.url' : "jdbc:postgresql://localhost:5432/Observer",
                         'dataSource.user' : "postgres",
                         'dataSource.password' : "postgres"
-                ]*/
+                ]
         ]
     }
 }

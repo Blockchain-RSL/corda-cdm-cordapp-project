@@ -2,14 +2,19 @@ package com.template.webserver.controller;
 
 import com.google.gson.Gson;
 import com.template.flows.AcceptanceFlow;
+import com.template.flows.ModificationFlow;
 import com.template.flows.ProposalFlow;
 import com.template.flows.RejectFlow;
 import com.template.states.TradeState;
 import com.template.webserver.dto.CdmStateDTO;
+import com.template.webserver.dto.NodeInfoDTO;
 import com.template.webserver.dto.TextMessageDTO;
+import com.template.webserver.dto.ValidationJsonDTO;
 import com.template.webserver.enums.NodeNameEnum;
+import com.template.webserver.rpc.NodeRPCConnectionNode;
 import com.template.webserver.rpc.impl.*;
 import com.template.webserver.utils.ParsingUtils;
+import net.corda.client.rpc.CordaRPCConnection;
 import net.corda.core.contracts.ContractState;
 import net.corda.core.contracts.StateAndRef;
 import net.corda.core.contracts.UniqueIdentifier;
@@ -17,6 +22,7 @@ import net.corda.core.identity.Party;
 import net.corda.core.messaging.CordaRPCOps;
 import net.corda.core.node.NodeInfo;
 import net.corda.core.node.services.Vault;
+import net.corda.core.node.services.vault.QueryCriteria;
 import org.json.simple.parser.ParseException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -83,41 +89,55 @@ public class ControllerNode {
 
         msg.setMessage(new Gson().toJson(new CdmStateDTO(tradeStateUpdate, me)));
         //logger.info("updateState " + msg);
-        //msg.setMessage("Ciao");
         template.convertAndSend("/topic/message", msg);
     }
 
     /******************* WEBSOCKET END *****************/
 
-    private final CordaRPCOps proxyNodeA;
-    private final CordaRPCOps proxyNodeB;
-    private final CordaRPCOps proxyNodeC;
-    private final CordaRPCOps proxyNotary;
-    private final CordaRPCOps proxyObserver;
+    private NodeRPCConnectionNodeA rpcConnectionNodeA;
+    private NodeRPCConnectionNodeB rpcConnectionNodeB;
+    private NodeRPCConnectionNodeC rpcConnectionNodeC;
+    private NodeRPCConnectionNodeNotary rpcConnectionNodeNotary;
+    private NodeRPCConnectionNodeObserver rpcConnectionNodeObserver;
 
     public ControllerNode(
-            NodeRPCConnectionNodeA rpcNodeA,
-            NodeRPCConnectionNodeB rpcNodeB,
-            NodeRPCConnectionNodeC rpcNodeC,
-            NodeRPCConnectionNodeNotary rpcNotary,
-            NodeRPCConnectionNodeObserver rpcObserver) {
+            NodeRPCConnectionNodeA rpcConnectionNodeA,
+            NodeRPCConnectionNodeB rpcConnectionNodeB,
+            NodeRPCConnectionNodeC rpcConnectionNodeC,
+            NodeRPCConnectionNodeNotary rpcConnectionNodeNotary,
+            NodeRPCConnectionNodeObserver rpcConnectionNodeObserver
+    ) {
 
-        proxyNodeA = rpcNodeA.proxy;
-        proxyNodeB = rpcNodeB.proxy;
-        proxyNodeC = rpcNodeC.proxy;
-        proxyNotary = rpcNotary.proxy;
-        proxyObserver = rpcObserver.proxy;
+        try {
+            this.rpcConnectionNodeA = rpcConnectionNodeA;
+            this.rpcConnectionNodeB = rpcConnectionNodeB;
+            this.rpcConnectionNodeC = rpcConnectionNodeC;
+            this.rpcConnectionNodeNotary = rpcConnectionNodeNotary;
+            this.rpcConnectionNodeObserver = rpcConnectionNodeObserver;
 
-        subscribe();
+            subscribe();
+        } catch(Exception exc) {
+            logger.error(exc.getMessage());
+        }
     }
 
     private Map<NodeNameEnum, CordaRPCOps> getMapProxy() {
-        Map<NodeNameEnum, CordaRPCOps> mapTmp = new HashMap<>();
-        mapTmp.put(NodeNameEnum.PARTY_A, proxyNodeA);
-        mapTmp.put(NodeNameEnum.PARTY_B, proxyNodeB);
-        mapTmp.put(NodeNameEnum.PARTY_C, proxyNodeC);
-        mapTmp.put(NodeNameEnum.NOTARY, proxyNotary);
-        mapTmp.put(NodeNameEnum.OBSERVER, proxyObserver);
+        final Map<NodeNameEnum, CordaRPCOps> mapTmp = new HashMap<>();
+
+        List<NodeRPCConnectionNode> listRpcConnection = new ArrayList<>();
+        listRpcConnection.add(rpcConnectionNodeA);
+        listRpcConnection.add(rpcConnectionNodeB);
+        listRpcConnection.add(rpcConnectionNodeC);
+        listRpcConnection.add(rpcConnectionNodeNotary);
+        listRpcConnection.add(rpcConnectionNodeObserver);
+
+        listRpcConnection.forEach(rpcConnection -> {
+            Optional<CordaRPCConnection> rpcConnectionOpt = Optional.ofNullable(rpcConnection.getRpcConnection());
+            if(rpcConnectionOpt.isPresent() && rpcConnectionOpt.get().getProxy() != null) {
+                mapTmp.put(rpcConnection.getNodeName(), rpcConnectionOpt.get().getProxy());
+            }
+        });
+
         return mapTmp;
     }
 
@@ -134,14 +154,43 @@ public class ControllerNode {
                 .filter(party -> party.getName().getOrganisation().equals(nodeName))
                 .findFirst();
 
-        return me.get().getName().toString();
+        return "Node Name: " + me.get().getName().getOrganisation() +
+                "  -  City: " + me.get().getName().getLocality() +
+                "  -  Country: " + me.get().getName().getCountry();
+        //return me.get().getName().toString();
+    }
+
+    private boolean getStatus(String nodeName) {
+        try {
+            getProxyByNodeName(nodeName).networkMapSnapshot().stream()
+                    .map(nodeInfo -> nodeInfo.getLegalIdentities().get(0))
+                    .filter(party -> party.getName().getOrganisation().equals(nodeName))
+                    .findFirst();
+            return true;
+        } catch(Exception exc) {
+            logger.error("getStatus of node %s error %s : ", nodeName, exc.getMessage());
+        }
+
+        return false;
+
+    }
+
+    @CrossOrigin(origins = "*")
+    @GetMapping(value = "/allNodesInfo", produces = APPLICATION_JSON_VALUE)
+    private List<NodeInfoDTO> allNodesInfo() {
+        return getProxyByNodeName("Observer").networkMapSnapshot().stream()
+                .map(nodeInfo -> {
+                    return new NodeInfoDTO(nodeInfo.getLegalIdentities().get(0),
+                            getStatus(nodeInfo.getLegalIdentities().get(0).getName().getOrganisation()));
+                })
+                .sorted(Comparator.comparing(nodeInfoDTO -> nodeInfoDTO.getName()))
+                .collect(Collectors.toList());
     }
 
     @CrossOrigin(origins = "*")
     @GetMapping(value = "/subscribe", produces = TEXT_PLAIN_VALUE)
     private void subscribe() {
         getMapProxy().forEach((nodeNameEnum, cordaRPCOps) -> {
-            System.out.println("NodeEnum " + nodeNameEnum.getNodeName());
 
             // search for party
             Optional<Party> me = getProxyByNodeName(nodeNameEnum.getNodeName()).networkMapSnapshot().stream()
@@ -177,6 +226,12 @@ public class ControllerNode {
     private String serverTime(String nodeName) {
 
         return (LocalDateTime.ofInstant(getProxyByNodeName(nodeName).currentNodeTime(), ZoneId.of("UTC"))).toString();
+    }
+
+    @CrossOrigin(origins = "*")
+    @GetMapping(value = "/getNodeStatus", produces = TEXT_PLAIN_VALUE)
+    private Boolean isNodeAlive(String nodeName) {
+        return getProxyByNodeName(nodeName).nodeInfo() != null;
     }
 
     @CrossOrigin(origins = "*")
@@ -244,23 +299,69 @@ public class ControllerNode {
         return states.stream().map(state -> {
             TradeState tradeState = (TradeState) state.getState().getData();
             return new CdmStateDTO(tradeState, me.get());
-        }).collect(Collectors.toList());
+            })
+                .sorted(Comparator.comparing(tradeState -> ((CdmStateDTO) tradeState).getTimestamp()).reversed())
+                .collect(Collectors.toList());
     }
+
+    @CrossOrigin(origins = "*")
+    @GetMapping(value = "/statesHistory", produces = MediaType.APPLICATION_JSON_VALUE)
+    private List<CdmStateDTO> statesHistory(String nodeName) {
+
+        // search for party
+        Optional<Party> me = getProxyByNodeName(nodeName).networkMapSnapshot().stream()
+                .map(nodeInfo -> nodeInfo.getLegalIdentities().get(0))
+                .filter(party -> party.getName().getOrganisation().equals(nodeName))
+                .findFirst();
+
+        QueryCriteria inputCriteria = new QueryCriteria.VaultQueryCriteria().withStatus(Vault.StateStatus.ALL);
+        return getProxyByNodeName(nodeName).vaultTrackByCriteria(TradeState.class, inputCriteria)
+                .getSnapshot().getStates().stream().map(stateRef -> {
+                    return new CdmStateDTO(stateRef.getState().getData(), me.get());
+                })
+                .sorted(Comparator.comparing(tradeState -> ((CdmStateDTO) tradeState).getTimestamp()).reversed())
+
+                .collect(Collectors.toList());
+
+    }
+
+
+    @CrossOrigin(origins = "*")
+    @PostMapping(value="/validateCDMJson")
+    private ValidationJsonDTO validateCDMJson(
+            @RequestBody String cdmBase64
+    ) throws ParseException {
+        logger.info("Started request validateCDMJson");
+        byte[] decodedBytes = Base64.getMimeDecoder().decode(cdmBase64.replace("\n", "").getBytes());
+        String decodedString = new String(decodedBytes);
+
+        try {
+            Map<String, Object> result = ParsingUtils.mapValuesFromIrsJSON(decodedString);
+
+            logger.info("Finished request validateCDMJson");
+
+            return new ValidationJsonDTO(true,
+                    "CDM Json is validate",
+                    (String) result.get("proposee"));
+        } catch(Exception exc) {
+            logger.error(exc.getMessage());
+            return new ValidationJsonDTO(false,
+                    "CDM Json is not validate");
+        }
+    }
+
 
     @CrossOrigin(origins = "*")
     @PostMapping(value="/startFlowProposal")
     private String startFlowProposal(
             String nodeName,
-            @RequestBody String cdmBase64) throws ParseException {
+            @RequestBody String cdmBase64
+        ) throws ParseException {
         logger.info("Started request startFlowProposal");
         byte[] decodedBytes = Base64.getMimeDecoder().decode(cdmBase64.replace("\n", "").getBytes());
         String decodedString = new String(decodedBytes);
 
-        Map<String, Object> mapValuesFromJSON = ParsingUtils.mapValuesFromJSON(decodedString);
-        mapValuesFromJSON.forEach((key, value) -> {
-            logger.info("Found key %s and values %s,",
-                    key, value);
-        });
+        Map<String, Object> mapValuesFromJSON = ParsingUtils.mapValuesFromIrsJSON(decodedString);
 
         String proposee = (String) mapValuesFromJSON.get("proposee");
         String instrumentType = (String) mapValuesFromJSON.get("instrumentType");
@@ -269,6 +370,8 @@ public class ControllerNode {
         Double price = (Double) mapValuesFromJSON.get("price");
         String currency = (String) mapValuesFromJSON.get("currency");
         String market = (String) mapValuesFromJSON.get("market");
+        String contractualDefinition = (String) mapValuesFromJSON.get("contractualDefinition");
+        String masterAgreement = (String) mapValuesFromJSON.get("masterAgreement");
 
         // search for party
         Optional<Party> proposeeOptional = getProxyByNodeName(proposee).networkMapSnapshot().stream()
@@ -287,13 +390,49 @@ public class ControllerNode {
             getProxyByNodeName(nodeName).startFlowDynamic(ProposalFlow.Initiator.class,
                     proposeeOptional.get(), observerOptional.get(),
                     instrumentType, instrument, quantity,
-                    price, currency, market);
+                    price, currency, market,
+                    contractualDefinition, masterAgreement,
+                    cdmBase64);
         } else {
             logger.error("Not found proposee or observer party");
             return "Not found proposee or observer party";
         }
 
         logger.info("Finished request startFlowProposal");
+        return "Finished with success";
+    }
+
+    @CrossOrigin(origins = "*")
+    @PostMapping(value="/startFlowModificationProposal")
+    private String startFlowModificationProposal (
+            String nodeName,
+            String quantity,
+            Double price,
+            String proposalId
+    ) throws Exception {
+        logger.info("Started request startFlowModificationProposal");
+
+        // search for observer
+        Optional<Party> observerOptional = getProxyByNodeName(nodeName).networkMapSnapshot().stream()
+                .map(nodeInfo -> nodeInfo.getLegalIdentities().get(0))
+                .filter(party -> party.getName().getOrganisation().equals("Observer"))
+                .findFirst();
+
+        // generate UUID
+        UniqueIdentifier uniqueIdentifier = UniqueIdentifier.Companion.fromString(proposalId);
+
+        // if exist then start flow
+        if(observerOptional.isPresent()) {
+            getProxyByNodeName(nodeName).startFlowDynamic(ModificationFlow.Initiator.class,
+                    uniqueIdentifier, price, quantity, observerOptional.get())
+                    .getReturnValue().get();
+
+        } else {
+            logger.error("Not found Observer party");
+            return "Not found observer party";
+        }
+
+        logger.info("Finished request startFlowModificationProposal");
         return "Finished with success";
     }
 

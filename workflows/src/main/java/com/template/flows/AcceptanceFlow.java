@@ -21,6 +21,7 @@ import org.jetbrains.annotations.NotNull;
 
 import java.security.PublicKey;
 import java.security.SignatureException;
+import java.util.Date;
 import java.util.List;
 
 public class AcceptanceFlow {
@@ -52,7 +53,10 @@ public class AcceptanceFlow {
             TradeState output = new TradeState(
                     input.getProposer(), input.getProposee(), input.getLinearId(),
                     input.getInstrumentType(), input.getInstrument(), input.getQuantity(),
-                    input.getPrice(), input.getCurrency(), input.getMarket(), TradeStatus.ACCEPTED);
+                    input.getPrice(), input.getCurrency(), input.getMarket(),
+                    input.getContractualDefinition(), input.getMasterAgreement(),
+                    TradeStatus.ACCEPTED,
+                    input.getCdmJsonBase64(), new Date());
 
             //Creating the command
             List<PublicKey> requiredSigners = ImmutableList.of(input.getProposee().getOwningKey(), input.getProposer().getOwningKey());

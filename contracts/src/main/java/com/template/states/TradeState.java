@@ -10,6 +10,7 @@ import net.corda.core.identity.AbstractParty;
 import net.corda.core.identity.Party;
 import net.corda.core.serialization.ConstructorForDeserialization;
 
+import java.util.Date;
 import java.util.List;
 
 @BelongsToContract(ProposalAndTradeContract.class)
@@ -17,20 +18,35 @@ public class TradeState implements LinearState/*, QueryableState*/ {
 
     private Party proposer;
     private Party proposee;
+
     private UniqueIdentifier linearId;
+
     private String instrumentType;
     private String instrument;
+
     private String quantity;
     private Double price;
+
     private String currency;
     private String market;
+
+    private String contractualDefinition;
+    private String masterAgreement;
+
     private TradeStatus tradeStatus;
+
+    private String cdmJsonBase64;
+    private Date timestamp;
 
     @ConstructorForDeserialization
     public TradeState(
-            Party proposer, Party proposee, UniqueIdentifier linearId,
+            Party proposer, Party proposee,
+            UniqueIdentifier linearId,
             String instrumentType, String instrument, String quantity,
-            Double price, String currency, String market, TradeStatus tradeStatus) {
+            Double price, String currency, String market,
+            String contractualDefinition, String masterAgreement,
+            TradeStatus tradeStatus,
+            String cdmJsonBase64, Date timestamp) {
         this.proposer = proposer;
         this.proposee = proposee;
         this.linearId = linearId;
@@ -40,13 +56,20 @@ public class TradeState implements LinearState/*, QueryableState*/ {
         this.price = price;
         this.currency = currency;
         this.market = market;
+        this.contractualDefinition = contractualDefinition;
+        this.masterAgreement = masterAgreement;
         this.tradeStatus = tradeStatus;
+        this.cdmJsonBase64 = cdmJsonBase64;
+        this.timestamp = timestamp;
     }
 
     public TradeState(
             Party proposer, Party proposee,
             String instrumentType, String instrument, String quantity,
-            Double price, String currency, String market, TradeStatus tradeStatus) {
+            Double price, String currency, String market,
+            String contractualDefinition, String masterAgreement,
+            TradeStatus tradeStatus,
+            String cdmJsonBase64, Date timestamp) {
         this.proposer = proposer;
         this.proposee = proposee;
         this.linearId = new UniqueIdentifier();
@@ -56,10 +79,12 @@ public class TradeState implements LinearState/*, QueryableState*/ {
         this.price = price;
         this.currency = currency;
         this.market = market;
+        this.contractualDefinition = contractualDefinition;
+        this.masterAgreement = masterAgreement;
         this.tradeStatus = tradeStatus;
+        this.cdmJsonBase64 = cdmJsonBase64;
+        this.timestamp = timestamp;
     }
-
-
 
     public Party getProposer() {
         return proposer;
@@ -97,8 +122,24 @@ public class TradeState implements LinearState/*, QueryableState*/ {
         return market;
     }
 
+    public String getCdmJsonBase64() {
+        return cdmJsonBase64;
+    }
+
+    public Date getTimestamp() {
+        return timestamp;
+    }
+
     public UniqueIdentifier getLinearId() {
         return linearId;
+    }
+
+    public String getContractualDefinition() {
+        return contractualDefinition;
+    }
+
+    public String getMasterAgreement() {
+        return masterAgreement;
     }
 
     @Override
@@ -128,6 +169,8 @@ public class TradeState implements LinearState/*, QueryableState*/ {
         return ImmutableList.of(new CDMSchema());
     }
 */
+
+
     @Override
     public String toString() {
         return String.format("ProposalState (" +

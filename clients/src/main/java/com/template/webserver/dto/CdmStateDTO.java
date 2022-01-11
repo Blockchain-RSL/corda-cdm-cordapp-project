@@ -5,19 +5,33 @@ import com.template.webserver.enums.TradeStatusResponseEnum;
 import net.corda.core.identity.Party;
 
 import java.io.Serializable;
+import java.util.Date;
 
 public class CdmStateDTO implements Serializable {
 
     private String proposer;
     private String proposee;
+
     private String linearId;
+
     private String instrumentType;
     private String instrument;
+
     private String quantity;
     private Double price;
+
     private String currency;
     private String market;
+
+    private String contractualDefinition;
+    private String masterAgreement;
+
+    private String cdmJsonBase64;
+    private Date timestamp;
+
     private TradeStatusResponseEnum tradeStatus;
+
+
 
     public CdmStateDTO(){};
 
@@ -31,6 +45,10 @@ public class CdmStateDTO implements Serializable {
         setQuantity(tradeState.getQuantity());
         setPrice(tradeState.getPrice());
         setLinearId(tradeState.getLinearId().getId().toString());
+        setContractualDefinition(tradeState.getContractualDefinition());
+        setMasterAgreement(tradeState.getMasterAgreement());
+        setCdmJsonBase64(tradeState.getCdmJsonBase64());
+        setTimestamp(tradeState.getTimestamp());
 
         // convert tradeStatus to a tradeStatus response
         // and check if it s proposed and for me, then it s an incoming status
@@ -41,6 +59,22 @@ public class CdmStateDTO implements Serializable {
                         && tradeState.getProposee().getName().equals(me.getName())) ?
                         TradeStatusResponseEnum.INCOMING : tradeStatusResponse);
     };
+
+    public String getContractualDefinition() {
+        return contractualDefinition;
+    }
+
+    public String getMasterAgreement() {
+        return masterAgreement;
+    }
+
+    public Date getTimestamp() {
+        return timestamp;
+    }
+
+    public String getCdmJsonBase64() {
+        return cdmJsonBase64;
+    }
 
     public String getInstrumentType() {
         return instrumentType;
@@ -80,6 +114,15 @@ public class CdmStateDTO implements Serializable {
 
     public TradeStatusResponseEnum getTradeStatus() {
         return tradeStatus;
+    }
+
+
+    public void setContractualDefinition(String contractualDefinition) {
+        this.contractualDefinition = contractualDefinition;
+    }
+
+    public void setMasterAgreement(String masterAgreement) {
+        this.masterAgreement = masterAgreement;
     }
 
     public void setProposer(String proposer) {
@@ -122,4 +165,11 @@ public class CdmStateDTO implements Serializable {
         this.market = market;
     }
 
+    public void setCdmJsonBase64(String cdmJsonBase64) {
+        this.cdmJsonBase64 = cdmJsonBase64;
+    }
+
+    public void setTimestamp(Date timestamp) {
+        this.timestamp = timestamp;
+    }
 }

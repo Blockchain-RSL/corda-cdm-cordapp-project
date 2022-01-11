@@ -19,6 +19,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.security.PublicKey;
+import java.util.Date;
 import java.util.List;
 
 public class ProposalFlow {
@@ -34,11 +35,16 @@ public class ProposalFlow {
         private Double price;
         private String currency;
         private String market;
+        private String contractualDefinition;
+        private String masterAgreement;
+        private String cdmJsonBase64;
 
         public Initiator(
                 Party counterparty, Party observer,
                 String instrumentType, String instrument, String quantity,
-                Double price, String currency, String market) {
+                Double price, String currency, String market,
+                String contractualDefinition, String masterAgreement,
+                String cdmJsonBase64) {
 
             this.counterparty = counterparty;
             this.observer = observer;
@@ -47,7 +53,10 @@ public class ProposalFlow {
             this.quantity = quantity;
             this.price = price;
             this.currency = currency;
+            this.contractualDefinition = contractualDefinition;
+            this.masterAgreement = masterAgreement;
             this.market = market;
+            this.cdmJsonBase64 = cdmJsonBase64;
         }
 
         @Suspendable
@@ -59,7 +68,10 @@ public class ProposalFlow {
             TradeState output = new TradeState(
                     getOurIdentity(), counterparty,
                     instrumentType, instrument, quantity,
-                    price, currency, market, TradeStatus.PROPOSED);
+                    price, currency, market,
+                    contractualDefinition, masterAgreement,
+                    TradeStatus.PROPOSED,
+                    cdmJsonBase64, new Date());
 
             //Creating the command
             ProposalAndTradeContract.Commands.Propose commandType = new ProposalAndTradeContract.Commands.Propose();

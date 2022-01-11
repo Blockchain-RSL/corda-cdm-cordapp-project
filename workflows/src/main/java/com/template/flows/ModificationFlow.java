@@ -3,8 +3,8 @@ package com.template.flows;
 import co.paralleluniverse.fibers.Suspendable;
 import com.google.common.collect.ImmutableList;
 import com.template.contracts.ProposalAndTradeContract;
-import com.template.states.TradeState;
 import com.template.enums.TradeStatus;
+import com.template.states.TradeState;
 import net.corda.core.contracts.Command;
 import net.corda.core.contracts.StateAndRef;
 import net.corda.core.contracts.UniqueIdentifier;
@@ -24,19 +24,25 @@ import java.security.SignatureException;
 import java.util.Date;
 import java.util.List;
 
-public class RejectFlow {
-
+public class ModificationFlow {
 
     @InitiatingFlow
     @StartableByRPC
     public static class Initiator extends FlowLogic<SignedTransaction> {
 
         private UniqueIdentifier proposalId;
+        private Double newPrice;
+        private String newQuantity;
         private Party observer;
+
         private ProgressTracker progressTracker = new ProgressTracker();
 
-        public Initiator(UniqueIdentifier proposalId, Party observer) {
+        public Initiator(UniqueIdentifier proposalId,
+                         Double newPrice, String newQuantity,
+                         Party observer) {
             this.proposalId = proposalId;
+            this.newPrice = newPrice;
+            this.newQuantity = newQuantity;
             this.observer = observer;
         }
 
@@ -53,15 +59,15 @@ public class RejectFlow {
             //Creating the output
             TradeState output = new TradeState(
                     input.getProposer(), input.getProposee(), input.getLinearId(),
-                    input.getInstrumentType(), input.getInstrument(), input.getQuantity(),
-                    input.getPrice(), input.getCurrency(), input.getMarket(),
+                    input.getInstrumentType(), input.getInstrument(), newQuantity,
+                    newPrice, input.getCurrency(), input.getMarket(),
                     input.getContractualDefinition(), input.getMasterAgreement(),
-                    TradeStatus.REJECTED,
-                    input.getCdmJsonBase64(), new Date());;
+                    TradeStatus.PROPOSED,
+                    input.getCdmJsonBase64(), new Date());
 
             //Creating the command
-            List<PublicKey> requiredSigners = ImmutableList.of(input.getProposee().getOwningKey(), input.getProposer().getOwningKey());
-            Command command = new Command(new ProposalAndTradeContract.Commands.Reject(), requiredSigners);
+            List<PublicKey> requiredSigners = ImmutableList.of(input.getProposer().getOwningKey(), input.getProposee().getOwningKey());
+            Command command = new Command(new ProposalAndTradeContract.Commands.Modification(), requiredSigners);
 
             //Building the transaction
             Party notary = inputStateAndRef.getState().getNotary();
@@ -74,7 +80,7 @@ public class RejectFlow {
             SignedTransaction partStx = getServiceHub().signInitialTransaction(txBuilder);
 
             //Gathering the counterparty's signature
-            Party counterparty = (getOurIdentity().equals(input.getProposer()))? input.getProposee() : input.getProposer();
+            Party counterparty = input.getProposee();
 
             System.out.println("Init ctp flow");
             FlowSession sessionCtp = initiateFlow(counterparty);
@@ -96,7 +102,7 @@ public class RejectFlow {
         }
     }
 
-    @InitiatedBy(RejectFlow.Initiator.class)
+    @InitiatedBy(Initiator.class)
     public static class Responder extends FlowLogic<SignedTransaction>{
         private FlowSession counterpartySession;
 
@@ -113,9 +119,9 @@ public class RejectFlow {
                 protected void checkTransaction(@NotNull SignedTransaction stx) throws FlowException {
                     try {
                         LedgerTransaction ledgerTx = stx.toLedgerTransaction(getServiceHub(), false);
-                        Party proposee = ledgerTx.inputsOfType(TradeState.class).get(0).getProposee();
-                        if(!proposee.equals(counterpartySession.getCounterparty())){
-                            throw new FlowException("Only the proposee can reject a proposal.");
+                        Party proposer = ledgerTx.inputsOfType(TradeState.class).get(0).getProposer();
+                        if(!proposer.equals(counterpartySession.getCounterparty())){
+                            throw new FlowException("Only the proposer can accept a modification.");
                         }
                     } catch (SignatureException e) {
                         throw new FlowException("Check transaction failed");

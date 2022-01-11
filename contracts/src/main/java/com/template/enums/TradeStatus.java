@@ -6,5 +6,5 @@ import net.corda.core.serialization.CordaSerializable;
 public enum TradeStatus {
     ACCEPTED,
     PROPOSED,
-    REJECTED
+    REJECTED,
 }

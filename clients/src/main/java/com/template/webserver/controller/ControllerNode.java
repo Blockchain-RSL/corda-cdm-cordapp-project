@@ -1,5 +1,6 @@
 package com.template.webserver.controller;
 
+import com.esotericsoftware.kryo.serializers.EnumNameSerializer;
 import com.google.gson.Gson;
 import com.template.flows.AcceptanceFlow;
 import com.template.flows.ModificationFlow;
@@ -35,6 +36,7 @@ import org.springframework.web.bind.annotation.*;
 import rx.Observable;
 import rx.Subscription;
 
+import javax.annotation.PostConstruct;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.*;
@@ -109,17 +111,45 @@ public class ControllerNode {
     ) {
 
         try {
-            this.rpcConnectionNodeA = rpcConnectionNodeA;
-            this.rpcConnectionNodeB = rpcConnectionNodeB;
-            this.rpcConnectionNodeC = rpcConnectionNodeC;
-            this.rpcConnectionNodeNotary = rpcConnectionNodeNotary;
-            this.rpcConnectionNodeObserver = rpcConnectionNodeObserver;
+            this.rpcConnectionNodeA = (NodeRPCConnectionNodeA) initializerRPCconnection(rpcConnectionNodeA);
+            this.rpcConnectionNodeB = (NodeRPCConnectionNodeB) initializerRPCconnection(rpcConnectionNodeB);
+            this.rpcConnectionNodeC = (NodeRPCConnectionNodeC) initializerRPCconnection(rpcConnectionNodeC);
+            this.rpcConnectionNodeNotary = (NodeRPCConnectionNodeNotary) initializerRPCconnection(rpcConnectionNodeNotary);
+            this.rpcConnectionNodeObserver = (NodeRPCConnectionNodeObserver) initializerRPCconnection(rpcConnectionNodeObserver);
 
             subscribe();
         } catch(Exception exc) {
             logger.error(exc.getMessage());
         }
+
     }
+
+    private NodeRPCConnectionNode initializerRPCconnection(NodeRPCConnectionNode nodeRPCConnectionNode) {
+        nodeRPCConnectionNode.setControllerNode(this);
+        return nodeRPCConnectionNode;
+    }
+
+
+    public void subscribeByNodeRPC(NodeNameEnum nodeNameEnum, CordaRPCOps cordaRPCOps) {
+        Optional<Party> me = getProxyByNodeName(nodeNameEnum.getNodeName()).networkMapSnapshot().stream()
+                .map(nodeInfo -> nodeInfo.getLegalIdentities().get(0))
+                .filter(party -> party.getName().getOrganisation().equals(nodeNameEnum))
+                .findFirst();
+
+        Observable<Vault.Update<TradeState>> obs = cordaRPCOps
+                .vaultTrack(TradeState.class).getUpdates();
+
+        obs.forEach(elem -> {
+            TradeState tradeStateProduced =
+                    (new ArrayList<>((Set<StateAndRef<TradeState>>) elem.getProduced()))
+                            .get(0).getState().getData();
+
+            updateState(tradeStateProduced, me.get());
+        });
+
+    }
+
+
 
     private Map<NodeNameEnum, CordaRPCOps> getMapProxy() {
         final Map<NodeNameEnum, CordaRPCOps> mapTmp = new HashMap<>();
@@ -191,23 +221,7 @@ public class ControllerNode {
     @GetMapping(value = "/subscribe", produces = TEXT_PLAIN_VALUE)
     private void subscribe() {
         getMapProxy().forEach((nodeNameEnum, cordaRPCOps) -> {
-
-            // search for party
-            Optional<Party> me = getProxyByNodeName(nodeNameEnum.getNodeName()).networkMapSnapshot().stream()
-                    .map(nodeInfo -> nodeInfo.getLegalIdentities().get(0))
-                    .filter(party -> party.getName().getOrganisation().equals(nodeNameEnum.getNodeName()))
-                    .findFirst();
-
-            Observable<Vault.Update<TradeState>> obs = cordaRPCOps
-                    .vaultTrack(TradeState.class).getUpdates();
-
-            obs.forEach(elem -> {
-                TradeState tradeStateProduced =
-                        (new ArrayList<>((Set<StateAndRef<TradeState>>) elem.getProduced()))
-                                .get(0).getState().getData();
-
-                updateState(tradeStateProduced, me.get());
-            });
+            subscribeByNodeRPC(nodeNameEnum, cordaRPCOps);
         })
         ;
     }

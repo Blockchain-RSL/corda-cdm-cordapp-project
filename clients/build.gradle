@@ -29,7 +29,9 @@ dependencies {
     implementation group: 'org.apache.commons', name: 'commons-compress', version: '1.0'
 
     // https://mvnrepository.com/artifact/com.github.rholder/guava-retrying
-    implementation 'com.github.rholder:guava-retrying:2.0.0'
+    //implementation 'com.github.rholder:guava-retrying:+'
+    // https://mvnrepository.com/artifact/com.github.rholder/guava-retrying
+    implementation group: 'com.github.rholder', name: 'guava-retrying', version: '2.+'
 
 
 }

@@ -116,7 +116,7 @@ public class ControllerNode {
             this.rpcConnectionNodeC = (NodeRPCConnectionNodeC) initializerRPCconnection(rpcConnectionNodeC);
             this.rpcConnectionNodeNotary = (NodeRPCConnectionNodeNotary) initializerRPCconnection(rpcConnectionNodeNotary);
             this.rpcConnectionNodeObserver = (NodeRPCConnectionNodeObserver) initializerRPCconnection(rpcConnectionNodeObserver);
-
+            //Thread.sleep(5000);
             subscribe();
         } catch(Exception exc) {
             logger.error(exc.getMessage());
@@ -125,21 +125,26 @@ public class ControllerNode {
     }
 
     private NodeRPCConnectionNode initializerRPCconnection(NodeRPCConnectionNode nodeRPCConnectionNode) {
-        nodeRPCConnectionNode.setControllerNode(this);
+        //nodeRPCConnectionNode.setControllerNode(this);
         return nodeRPCConnectionNode;
     }
 
 
     public void subscribeByNodeRPC(NodeNameEnum nodeNameEnum, CordaRPCOps cordaRPCOps) {
+        System.out.println("subscribe by node " + nodeNameEnum);
         Optional<Party> me = getProxyByNodeName(nodeNameEnum.getNodeName()).networkMapSnapshot().stream()
                 .map(nodeInfo -> nodeInfo.getLegalIdentities().get(0))
                 .filter(party -> party.getName().getOrganisation().equals(nodeNameEnum))
                 .findFirst();
 
-        Observable<Vault.Update<TradeState>> obs = cordaRPCOps
+        /* cordaROCOPS = proxy.
+        * l'elenco di stati osservati sono riferiti ad un'istanza del RPCProxy */
+        Observable<Vault.Update<TradeState>> obs = getProxyByNodeName(nodeNameEnum.getNodeName())
                 .vaultTrack(TradeState.class).getUpdates();
+        System.out.println("if a = b" + cordaRPCOps.equals(getProxyByNodeName(nodeNameEnum.getNodeName())));
 
         obs.forEach(elem -> {
+            System.out.println("receive event " + nodeNameEnum);
             TradeState tradeStateProduced =
                     (new ArrayList<>((Set<StateAndRef<TradeState>>) elem.getProduced()))
                             .get(0).getState().getData();

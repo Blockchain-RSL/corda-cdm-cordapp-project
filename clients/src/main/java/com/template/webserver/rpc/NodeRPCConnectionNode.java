@@ -33,7 +33,7 @@ public abstract class NodeRPCConnectionNode {
     // components
     private CordaRPCConnection rpcConnection;
 
-    private ControllerNode controllerNode;
+    //private ControllerNode controllerNode;
 
     /** This method handles the reconnection of RPC client to a node, in two cases:
      *  1) Server starts with all node up, and later some node goes down
@@ -48,13 +48,14 @@ public abstract class NodeRPCConnectionNode {
                 },
                 () -> {
                     logger.info("on reconnect");
-                    controllerNode.subscribeByNodeRPC(getNodeName(), getRpcProxy());
+                    //controllerNode.subscribeByNodeRPC(getNodeName(), getRpcProxy());
                 },
                 -1);
 
         NetworkHostAndPort rpcAddress = new NetworkHostAndPort(getHost(), getPort());
         CordaRPCClient rpcClient = new CordaRPCClient(rpcAddress);
-
+        rpcConnection = rpcClient.start(getUser(), getPsw(), gracefulReconnect);
+    /*
         // This block of code handles the second case of reconnection:
         // If a node is not connected, a pool of threads is created to pooling the node to retry the RPC connection
 
@@ -92,7 +93,7 @@ public abstract class NodeRPCConnectionNode {
                         }
                         return null;
                 });
-        executor.execute(future);
+        executor.execute(future);*/
     }
 
     public CordaRPCConnection getRpcConnection() {
@@ -103,7 +104,7 @@ public abstract class NodeRPCConnectionNode {
         return rpcConnection.getProxy();
     }
 
-    public void setControllerNode(ControllerNode controllerNode) {
+    /*public void setControllerNode(ControllerNode controllerNode) {
         this.controllerNode = controllerNode;
-    }
+    }*/
 }

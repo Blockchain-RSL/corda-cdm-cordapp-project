@@ -1,6 +1,5 @@
 package com.template.webserver.controller;
 
-import com.esotericsoftware.kryo.serializers.EnumNameSerializer;
 import com.google.gson.Gson;
 import com.template.flows.AcceptanceFlow;
 import com.template.flows.ModificationFlow;
@@ -36,7 +35,6 @@ import org.springframework.web.bind.annotation.*;
 import rx.Observable;
 import rx.Subscription;
 
-import javax.annotation.PostConstruct;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.*;
@@ -111,45 +109,17 @@ public class ControllerNode {
     ) {
 
         try {
-            this.rpcConnectionNodeA = (NodeRPCConnectionNodeA) initializerRPCconnection(rpcConnectionNodeA);
-            this.rpcConnectionNodeB = (NodeRPCConnectionNodeB) initializerRPCconnection(rpcConnectionNodeB);
-            this.rpcConnectionNodeC = (NodeRPCConnectionNodeC) initializerRPCconnection(rpcConnectionNodeC);
-            this.rpcConnectionNodeNotary = (NodeRPCConnectionNodeNotary) initializerRPCconnection(rpcConnectionNodeNotary);
-            this.rpcConnectionNodeObserver = (NodeRPCConnectionNodeObserver) initializerRPCconnection(rpcConnectionNodeObserver);
+            this.rpcConnectionNodeA = rpcConnectionNodeA;
+            this.rpcConnectionNodeB = rpcConnectionNodeB;
+            this.rpcConnectionNodeC = rpcConnectionNodeC;
+            this.rpcConnectionNodeNotary = rpcConnectionNodeNotary;
+            this.rpcConnectionNodeObserver = rpcConnectionNodeObserver;
 
             subscribe();
         } catch(Exception exc) {
             logger.error(exc.getMessage());
         }
-
     }
-
-    private NodeRPCConnectionNode initializerRPCconnection(NodeRPCConnectionNode nodeRPCConnectionNode) {
-        nodeRPCConnectionNode.setControllerNode(this);
-        return nodeRPCConnectionNode;
-    }
-
-
-    public void subscribeByNodeRPC(NodeNameEnum nodeNameEnum, CordaRPCOps cordaRPCOps) {
-        Optional<Party> me = getProxyByNodeName(nodeNameEnum.getNodeName()).networkMapSnapshot().stream()
-                .map(nodeInfo -> nodeInfo.getLegalIdentities().get(0))
-                .filter(party -> party.getName().getOrganisation().equals(nodeNameEnum))
-                .findFirst();
-
-        Observable<Vault.Update<TradeState>> obs = cordaRPCOps
-                .vaultTrack(TradeState.class).getUpdates();
-
-        obs.forEach(elem -> {
-            TradeState tradeStateProduced =
-                    (new ArrayList<>((Set<StateAndRef<TradeState>>) elem.getProduced()))
-                            .get(0).getState().getData();
-
-            updateState(tradeStateProduced, me.get());
-        });
-
-    }
-
-
 
     private Map<NodeNameEnum, CordaRPCOps> getMapProxy() {
         final Map<NodeNameEnum, CordaRPCOps> mapTmp = new HashMap<>();
@@ -177,17 +147,14 @@ public class ControllerNode {
     }
 
     @CrossOrigin(origins = "*")
-    @GetMapping(value = "/info", produces = TEXT_PLAIN_VALUE)
-    private String info(String nodeName) {
+    @GetMapping(value = "/info", produces = APPLICATION_JSON_VALUE)
+    private NodeInfoDTO info(String nodeName) {
         Optional<Party> me = getProxyByNodeName(nodeName).networkMapSnapshot().stream()
                 .map(nodeInfo -> nodeInfo.getLegalIdentities().get(0))
                 .filter(party -> party.getName().getOrganisation().equals(nodeName))
                 .findFirst();
 
-        return "Node Name: " + me.get().getName().getOrganisation() +
-                "  -  City: " + me.get().getName().getLocality() +
-                "  -  Country: " + me.get().getName().getCountry();
-        //return me.get().getName().toString();
+        return new NodeInfoDTO(me.get());
     }
 
     private boolean getStatus(String nodeName) {
@@ -221,7 +188,23 @@ public class ControllerNode {
     @GetMapping(value = "/subscribe", produces = TEXT_PLAIN_VALUE)
     private void subscribe() {
         getMapProxy().forEach((nodeNameEnum, cordaRPCOps) -> {
-            subscribeByNodeRPC(nodeNameEnum, cordaRPCOps);
+
+            // search for party
+            Optional<Party> me = getProxyByNodeName(nodeNameEnum.getNodeName()).networkMapSnapshot().stream()
+                    .map(nodeInfo -> nodeInfo.getLegalIdentities().get(0))
+                    .filter(party -> party.getName().getOrganisation().equals(nodeNameEnum.getNodeName()))
+                    .findFirst();
+
+            Observable<Vault.Update<TradeState>> obs = cordaRPCOps
+                    .vaultTrack(TradeState.class).getUpdates();
+
+            obs.forEach(elem -> {
+                TradeState tradeStateProduced =
+                        (new ArrayList<>((Set<StateAndRef<TradeState>>) elem.getProduced()))
+                                .get(0).getState().getData();
+
+                updateState(tradeStateProduced, me.get());
+            });
         })
         ;
     }
@@ -267,7 +250,7 @@ public class ControllerNode {
     }
 
     @CrossOrigin(origins = "*")
- 	@GetMapping(value = "/peers", produces = APPLICATION_JSON_VALUE)
+    @GetMapping(value = "/peers", produces = APPLICATION_JSON_VALUE)
     public HashMap<String, List<String>> getPeers(String nodeName) {
         HashMap<String, List<String>> myMap = new HashMap<>();
 
@@ -282,25 +265,25 @@ public class ControllerNode {
     }
 
     @CrossOrigin(origins = "*")
- 	@GetMapping(value = "/notaries", produces = TEXT_PLAIN_VALUE)
+    @GetMapping(value = "/notaries", produces = TEXT_PLAIN_VALUE)
     private String notaries(String nodeName) {
         return getProxyByNodeName(nodeName).notaryIdentities().toString();
     }
 
     @CrossOrigin(origins = "*")
- 	@GetMapping(value = "/flows", produces = TEXT_PLAIN_VALUE)
+    @GetMapping(value = "/flows", produces = TEXT_PLAIN_VALUE)
     private String flows(String nodeName) {
         return getProxyByNodeName(nodeName).registeredFlows().toString();
     }
 
     @CrossOrigin(origins = "*")
- 	@GetMapping(value = "/states", produces = TEXT_PLAIN_VALUE)
+    @GetMapping(value = "/states", produces = TEXT_PLAIN_VALUE)
     private String states(String nodeName) {
         return getProxyByNodeName(nodeName).vaultQuery(ContractState.class).getStates().toString();
     }
 
     @CrossOrigin(origins = "*")
- 	@GetMapping(value = "/statesDetail", produces = MediaType.APPLICATION_JSON_VALUE)
+    @GetMapping(value = "/statesDetail", produces = MediaType.APPLICATION_JSON_VALUE)
     private List<CdmStateDTO> statesDetail(String nodeName) {
 
         // search for party
@@ -313,7 +296,7 @@ public class ControllerNode {
         return states.stream().map(state -> {
             TradeState tradeState = (TradeState) state.getState().getData();
             return new CdmStateDTO(tradeState, me.get());
-            })
+        })
                 .sorted(Comparator.comparing(tradeState -> ((CdmStateDTO) tradeState).getTimestamp()).reversed())
                 .collect(Collectors.toList());
     }
@@ -370,7 +353,7 @@ public class ControllerNode {
     private String startFlowProposal(
             String nodeName,
             @RequestBody String cdmBase64
-        ) throws ParseException {
+    ) throws ParseException {
         logger.info("Started request startFlowProposal");
         byte[] decodedBytes = Base64.getMimeDecoder().decode(cdmBase64.replace("\n", "").getBytes());
         String decodedString = new String(decodedBytes);

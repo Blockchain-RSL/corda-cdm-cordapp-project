@@ -9,6 +9,12 @@ public class NodeInfoDTO {
     private String country;
     private boolean status;
 
+    public NodeInfoDTO(Party party) {
+        this.name = party.getName().getOrganisation();
+        this.city = party.getName().getLocality();
+        this.country = party.getName().getCountry();
+    }
+
     public NodeInfoDTO(Party party, boolean isNodeUp) {
         this.name = party.getName().getOrganisation();
         this.city = party.getName().getLocality();

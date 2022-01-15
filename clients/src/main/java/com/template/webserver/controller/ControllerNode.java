@@ -1,6 +1,5 @@
 package com.template.webserver.controller;
 
-import com.esotericsoftware.kryo.serializers.EnumNameSerializer;
 import com.google.gson.Gson;
 import com.template.flows.AcceptanceFlow;
 import com.template.flows.ModificationFlow;
@@ -36,7 +35,6 @@ import org.springframework.web.bind.annotation.*;
 import rx.Observable;
 import rx.Subscription;
 
-import javax.annotation.PostConstruct;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.*;
@@ -102,6 +100,7 @@ public class ControllerNode {
     private NodeRPCConnectionNodeNotary rpcConnectionNodeNotary;
     private NodeRPCConnectionNodeObserver rpcConnectionNodeObserver;
 
+
     public ControllerNode(
             NodeRPCConnectionNodeA rpcConnectionNodeA,
             NodeRPCConnectionNodeB rpcConnectionNodeB,
@@ -116,45 +115,54 @@ public class ControllerNode {
             this.rpcConnectionNodeC = (NodeRPCConnectionNodeC) initializerRPCconnection(rpcConnectionNodeC);
             this.rpcConnectionNodeNotary = (NodeRPCConnectionNodeNotary) initializerRPCconnection(rpcConnectionNodeNotary);
             this.rpcConnectionNodeObserver = (NodeRPCConnectionNodeObserver) initializerRPCconnection(rpcConnectionNodeObserver);
-            //Thread.sleep(5000);
-            subscribe();
-        } catch(Exception exc) {
+
+            // subscribe all nodes
+            subscribeByNodeRPC(rpcConnectionNodeA.getNodeName());
+            subscribeByNodeRPC(rpcConnectionNodeB.getNodeName());
+            subscribeByNodeRPC(rpcConnectionNodeC.getNodeName());
+            subscribeByNodeRPC(rpcConnectionNodeNotary.getNodeName());
+            subscribeByNodeRPC(rpcConnectionNodeObserver.getNodeName());
+
+        } catch (Exception exc) {
             logger.error(exc.getMessage());
         }
-
     }
 
     private NodeRPCConnectionNode initializerRPCconnection(NodeRPCConnectionNode nodeRPCConnectionNode) {
-        //nodeRPCConnectionNode.setControllerNode(this);
+        nodeRPCConnectionNode.setControllerNode(this);
         return nodeRPCConnectionNode;
     }
 
+    /**
+     * Subscribe a node to update their status and to brodcast them to client by a websocket
+     *
+     * @param nodeName
+     */
+    @CrossOrigin(origins = "*")
+    @GetMapping(value = "/subscribe", produces = TEXT_PLAIN_VALUE)
+    public void subscribeByNodeRPC(NodeNameEnum nodeName) {
+        getMapProxy().forEach((nodeNameEnum, cordaRPCOps) -> {
 
-    public void subscribeByNodeRPC(NodeNameEnum nodeNameEnum, CordaRPCOps cordaRPCOps) {
-        System.out.println("subscribe by node " + nodeNameEnum);
-        Optional<Party> me = getProxyByNodeName(nodeNameEnum.getNodeName()).networkMapSnapshot().stream()
-                .map(nodeInfo -> nodeInfo.getLegalIdentities().get(0))
-                .filter(party -> party.getName().getOrganisation().equals(nodeNameEnum))
-                .findFirst();
+            if (nodeName.equals(nodeNameEnum)) {
+                // search for party
+                Optional<Party> me = getProxyByNodeName(nodeNameEnum.getNodeName()).networkMapSnapshot().stream()
+                        .map(nodeInfo -> nodeInfo.getLegalIdentities().get(0))
+                        .filter(party -> party.getName().getOrganisation().equals(nodeNameEnum.getNodeName()))
+                        .findFirst();
 
-        /* cordaROCOPS = proxy.
-        * l'elenco di stati osservati sono riferiti ad un'istanza del RPCProxy */
-        Observable<Vault.Update<TradeState>> obs = getProxyByNodeName(nodeNameEnum.getNodeName())
-                .vaultTrack(TradeState.class).getUpdates();
-        System.out.println("if a = b" + cordaRPCOps.equals(getProxyByNodeName(nodeNameEnum.getNodeName())));
+                Observable<Vault.Update<TradeState>> obs = cordaRPCOps
+                        .vaultTrack(TradeState.class).getUpdates();
 
-        obs.forEach(elem -> {
-            System.out.println("receive event " + nodeNameEnum);
-            TradeState tradeStateProduced =
-                    (new ArrayList<>((Set<StateAndRef<TradeState>>) elem.getProduced()))
-                            .get(0).getState().getData();
+                obs.forEach(elem -> {
+                    TradeState tradeStateProduced =
+                            (new ArrayList<>((Set<StateAndRef<TradeState>>) elem.getProduced()))
+                                    .get(0).getState().getData();
 
-            updateState(tradeStateProduced, me.get());
+                    updateState(tradeStateProduced, me.get());
+                });
+            }
         });
-
     }
-
-
 
     private Map<NodeNameEnum, CordaRPCOps> getMapProxy() {
         final Map<NodeNameEnum, CordaRPCOps> mapTmp = new HashMap<>();
@@ -168,7 +176,7 @@ public class ControllerNode {
 
         listRpcConnection.forEach(rpcConnection -> {
             Optional<CordaRPCConnection> rpcConnectionOpt = Optional.ofNullable(rpcConnection.getRpcConnection());
-            if(rpcConnectionOpt.isPresent() && rpcConnectionOpt.get().getProxy() != null) {
+            if (rpcConnectionOpt.isPresent() && rpcConnectionOpt.get().getProxy() != null) {
                 mapTmp.put(rpcConnection.getNodeName(), rpcConnectionOpt.get().getProxy());
             }
         });
@@ -182,17 +190,14 @@ public class ControllerNode {
     }
 
     @CrossOrigin(origins = "*")
-    @GetMapping(value = "/info", produces = TEXT_PLAIN_VALUE)
-    private String info(String nodeName) {
+    @GetMapping(value = "/info", produces = APPLICATION_JSON_VALUE)
+    private NodeInfoDTO info(String nodeName) {
         Optional<Party> me = getProxyByNodeName(nodeName).networkMapSnapshot().stream()
                 .map(nodeInfo -> nodeInfo.getLegalIdentities().get(0))
                 .filter(party -> party.getName().getOrganisation().equals(nodeName))
                 .findFirst();
 
-        return "Node Name: " + me.get().getName().getOrganisation() +
-                "  -  City: " + me.get().getName().getLocality() +
-                "  -  Country: " + me.get().getName().getCountry();
-        //return me.get().getName().toString();
+        return new NodeInfoDTO(me.get(), me.isPresent());
     }
 
     private boolean getStatus(String nodeName) {
@@ -202,12 +207,11 @@ public class ControllerNode {
                     .filter(party -> party.getName().getOrganisation().equals(nodeName))
                     .findFirst();
             return true;
-        } catch(Exception exc) {
+        } catch (Exception exc) {
             logger.error("getStatus of node %s error %s : ", nodeName, exc.getMessage());
         }
 
         return false;
-
     }
 
     @CrossOrigin(origins = "*")
@@ -220,15 +224,6 @@ public class ControllerNode {
                 })
                 .sorted(Comparator.comparing(nodeInfoDTO -> nodeInfoDTO.getName()))
                 .collect(Collectors.toList());
-    }
-
-    @CrossOrigin(origins = "*")
-    @GetMapping(value = "/subscribe", produces = TEXT_PLAIN_VALUE)
-    private void subscribe() {
-        getMapProxy().forEach((nodeNameEnum, cordaRPCOps) -> {
-            subscribeByNodeRPC(nodeNameEnum, cordaRPCOps);
-        })
-        ;
     }
 
     @CrossOrigin(origins = "*")
@@ -272,7 +267,7 @@ public class ControllerNode {
     }
 
     @CrossOrigin(origins = "*")
- 	@GetMapping(value = "/peers", produces = APPLICATION_JSON_VALUE)
+    @GetMapping(value = "/peers", produces = APPLICATION_JSON_VALUE)
     public HashMap<String, List<String>> getPeers(String nodeName) {
         HashMap<String, List<String>> myMap = new HashMap<>();
 
@@ -287,25 +282,25 @@ public class ControllerNode {
     }
 
     @CrossOrigin(origins = "*")
- 	@GetMapping(value = "/notaries", produces = TEXT_PLAIN_VALUE)
+    @GetMapping(value = "/notaries", produces = TEXT_PLAIN_VALUE)
     private String notaries(String nodeName) {
         return getProxyByNodeName(nodeName).notaryIdentities().toString();
     }
 
     @CrossOrigin(origins = "*")
- 	@GetMapping(value = "/flows", produces = TEXT_PLAIN_VALUE)
+    @GetMapping(value = "/flows", produces = TEXT_PLAIN_VALUE)
     private String flows(String nodeName) {
         return getProxyByNodeName(nodeName).registeredFlows().toString();
     }
 
     @CrossOrigin(origins = "*")
- 	@GetMapping(value = "/states", produces = TEXT_PLAIN_VALUE)
+    @GetMapping(value = "/states", produces = TEXT_PLAIN_VALUE)
     private String states(String nodeName) {
         return getProxyByNodeName(nodeName).vaultQuery(ContractState.class).getStates().toString();
     }
 
     @CrossOrigin(origins = "*")
- 	@GetMapping(value = "/statesDetail", produces = MediaType.APPLICATION_JSON_VALUE)
+    @GetMapping(value = "/statesDetail", produces = MediaType.APPLICATION_JSON_VALUE)
     private List<CdmStateDTO> statesDetail(String nodeName) {
 
         // search for party
@@ -314,11 +309,11 @@ public class ControllerNode {
                 .filter(party -> party.getName().getOrganisation().equals(nodeName))
                 .findFirst();
 
-        List<StateAndRef<ContractState>> states= getProxyByNodeName(nodeName).vaultQuery(ContractState.class).getStates();
+        List<StateAndRef<ContractState>> states = getProxyByNodeName(nodeName).vaultQuery(ContractState.class).getStates();
         return states.stream().map(state -> {
             TradeState tradeState = (TradeState) state.getState().getData();
             return new CdmStateDTO(tradeState, me.get());
-            })
+        })
                 .sorted(Comparator.comparing(tradeState -> ((CdmStateDTO) tradeState).getTimestamp()).reversed())
                 .collect(Collectors.toList());
     }
@@ -341,12 +336,10 @@ public class ControllerNode {
                 .sorted(Comparator.comparing(tradeState -> ((CdmStateDTO) tradeState).getTimestamp()).reversed())
 
                 .collect(Collectors.toList());
-
     }
 
-
     @CrossOrigin(origins = "*")
-    @PostMapping(value="/validateCDMJson")
+    @PostMapping(value = "/validateCDMJson")
     private ValidationJsonDTO validateCDMJson(
             @RequestBody String cdmBase64
     ) throws ParseException {
@@ -362,20 +355,19 @@ public class ControllerNode {
             return new ValidationJsonDTO(true,
                     "CDM Json is validate",
                     (String) result.get("proposee"));
-        } catch(Exception exc) {
+        } catch (Exception exc) {
             logger.error(exc.getMessage());
             return new ValidationJsonDTO(false,
                     "CDM Json is not validate");
         }
     }
 
-
     @CrossOrigin(origins = "*")
-    @PostMapping(value="/startFlowProposal")
+    @PostMapping(value = "/startFlowProposal")
     private String startFlowProposal(
             String nodeName,
             @RequestBody String cdmBase64
-        ) throws ParseException {
+    ) throws ParseException {
         logger.info("Started request startFlowProposal");
         byte[] decodedBytes = Base64.getMimeDecoder().decode(cdmBase64.replace("\n", "").getBytes());
         String decodedString = new String(decodedBytes);
@@ -405,7 +397,7 @@ public class ControllerNode {
                 .findFirst();
 
         // if exist then start flow
-        if(proposeeOptional.isPresent() && observerOptional.isPresent()) {
+        if (proposeeOptional.isPresent() && observerOptional.isPresent()) {
             getProxyByNodeName(nodeName).startFlowDynamic(ProposalFlow.Initiator.class,
                     proposeeOptional.get(), observerOptional.get(),
                     instrumentType, instrument, quantity,
@@ -422,8 +414,8 @@ public class ControllerNode {
     }
 
     @CrossOrigin(origins = "*")
-    @PostMapping(value="/startFlowModificationProposal")
-    private String startFlowModificationProposal (
+    @PostMapping(value = "/startFlowModificationProposal")
+    private String startFlowModificationProposal(
             String nodeName,
             String quantity,
             Double price,
@@ -441,7 +433,7 @@ public class ControllerNode {
         UniqueIdentifier uniqueIdentifier = UniqueIdentifier.Companion.fromString(proposalId);
 
         // if exist then start flow
-        if(observerOptional.isPresent()) {
+        if (observerOptional.isPresent()) {
             getProxyByNodeName(nodeName).startFlowDynamic(ModificationFlow.Initiator.class,
                     uniqueIdentifier, price, quantity, observerOptional.get())
                     .getReturnValue().get();
@@ -456,8 +448,8 @@ public class ControllerNode {
     }
 
     @CrossOrigin(origins = "*")
-    @PostMapping(value="/startFlowAcceptProposal")
-    private String startFlowAcceptProposal (
+    @PostMapping(value = "/startFlowAcceptProposal")
+    private String startFlowAcceptProposal(
             String nodeName, String proposalId
     ) throws Exception {
         logger.info("Started request startFlowAcceptProposal");
@@ -472,7 +464,7 @@ public class ControllerNode {
         UniqueIdentifier uniqueIdentifier = UniqueIdentifier.Companion.fromString(proposalId);
 
         // if exist then start flow
-        if(observerOptional.isPresent()) {
+        if (observerOptional.isPresent()) {
             getProxyByNodeName(nodeName).startFlowDynamic(AcceptanceFlow.Initiator.class,
                     uniqueIdentifier, observerOptional.get()).getReturnValue().get();
 
@@ -486,7 +478,7 @@ public class ControllerNode {
     }
 
     @CrossOrigin(origins = "*")
-    @PostMapping(value="/startFlowRejectProposal")
+    @PostMapping(value = "/startFlowRejectProposal")
     private String startFlowRejectProposal(
             String nodeName, String proposalId
     ) {
@@ -502,7 +494,7 @@ public class ControllerNode {
         UniqueIdentifier uniqueIdentifier = UniqueIdentifier.Companion.fromString(proposalId);
 
         // if exist then start flow
-        if(observerOptional.isPresent()) {
+        if (observerOptional.isPresent()) {
             getProxyByNodeName(nodeName).startFlowDynamic(RejectFlow.Initiator.class,
                     uniqueIdentifier, observerOptional.get());
         } else {

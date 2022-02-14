@@ -3,6 +3,7 @@ package com.template.webserver.rpc;
 import com.github.rholder.retry.*;
 import com.template.webserver.controller.ControllerNode;
 import com.template.webserver.enums.NodeNameEnum;
+import com.template.webserver.enums.NodeStatusEnum;
 import net.corda.client.rpc.CordaRPCClient;
 import net.corda.client.rpc.CordaRPCConnection;
 import net.corda.client.rpc.GracefulReconnect;
@@ -13,6 +14,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.concurrent.*;
+import java.util.function.Predicate;
 
 /**
  * This class handles the connection beetween Corda node and the server
@@ -34,6 +36,9 @@ public abstract class NodeRPCConnectionNode {
     private CordaRPCConnection rpcConnection;
     private ControllerNode controllerNode;
 
+    //enum
+    private NodeStatusEnum nodeStatus;
+
     /**
      * Initialize rpc client constructor with reconnect management with gracefull and first connection retries with
      * polling execution single Thread
@@ -44,10 +49,13 @@ public abstract class NodeRPCConnectionNode {
         GracefulReconnect gracefulReconnect = new GracefulReconnect(
                 () -> {
                     logger.info("on disconnect");
+                    nodeStatus = NodeStatusEnum.NODE_DOWN;
+
                 },
                 () -> {
                     logger.info("on reconnect");
                     controllerNode.subscribeByNodeRPC(getNodeName());
+                    nodeStatus = NodeStatusEnum.NODE_ACTIVE;
                 },
                 -1);
 
@@ -58,15 +66,16 @@ public abstract class NodeRPCConnectionNode {
            If a node is not connected, a pool of threads is created to pooling the node to retry the RPC connection
            retryer defines the conditions to polling the node: if connection is down the retryer will try to reconnect
            every 5 seconds and will not stop until it reconnects */
+
         Retryer<Boolean> retryer = RetryerBuilder.<Boolean>newBuilder()
                 .retryIfResult(aBoolean -> {
                     try {
                         rpcConnection = rpcClient.start(getUser(), getPsw(), gracefulReconnect);
                         controllerNode.subscribeByNodeRPC(getNodeName());
-                        //controllerNode.subscribe();
+                        nodeStatus = NodeStatusEnum.NODE_ACTIVE;
                         aBoolean = false;
                     } catch(Exception  exc) {
-                        aBoolean = true;
+                        nodeStatus = NodeStatusEnum.NODE_DOWN;
                     }
                     return aBoolean;
                 })
@@ -102,5 +111,13 @@ public abstract class NodeRPCConnectionNode {
 
     public void setControllerNode(ControllerNode controllerNode) {
         this.controllerNode = controllerNode;
+    }
+
+    public NodeStatusEnum getNodeStatus() {
+        return nodeStatus;
+    }
+
+    public void setNodeStatus(NodeStatusEnum nodeStatus) {
+        this.nodeStatus = nodeStatus;
     }
 }

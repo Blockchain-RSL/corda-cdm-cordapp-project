@@ -54,10 +54,22 @@ public class CdmStateDTO implements Serializable {
         // and check if it s proposed and for me, then it s an incoming status
         TradeStatusResponseEnum tradeStatusResponse =
                 TradeStatusResponseEnum.convertTradeStatusToResponse(tradeState.getTradeStatus());
-        setTradeStatus(
-                (tradeStatusResponse == TradeStatusResponseEnum.PROPOSED
+
+        /*setTradeStatus((tradeStatusResponse == TradeStatusResponseEnum.PROPOSED
                         && tradeState.getProposee().getName().equals(me.getName())) ?
-                        TradeStatusResponseEnum.INCOMING : tradeStatusResponse);
+                        TradeStatusResponseEnum.INCOMING : tradeStatusResponse);*/
+
+        if(tradeStatusResponse == TradeStatusResponseEnum.PROPOSED && tradeState.getProposee().getName().equals(me.getName())) {
+            tradeStatusResponse = TradeStatusResponseEnum.INCOMING;
+        }else if (tradeStatusResponse == TradeStatusResponseEnum.COUNTERPROPOSED
+                && tradeState.getProposer().getName().equals(me.getName())) {
+            tradeStatusResponse = TradeStatusResponseEnum.INCOMING_COUNTERPROPOSAL;
+        }/*else if (tradeStatusResponse == TradeStatusResponseEnum.REJECTED
+                && tradeState.getProposee().getName().equals(me.getName())) {
+            tradeStatusResponse = TradeStatusResponseEnum.REJECTED_BY_PROPOSER;
+        }*/
+
+        setTradeStatus(tradeStatusResponse);
     };
 
     public String getContractualDefinition() {

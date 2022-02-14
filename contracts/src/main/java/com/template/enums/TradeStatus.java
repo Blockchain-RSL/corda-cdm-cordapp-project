@@ -7,4 +7,5 @@ public enum TradeStatus {
     ACCEPTED,
     PROPOSED,
     REJECTED,
+    COUNTERPROPOSED,
 }

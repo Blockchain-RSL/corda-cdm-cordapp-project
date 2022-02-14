@@ -1,6 +1,17 @@
 package com.template.schema;
 
-/**
+import net.corda.core.schemas.MappedSchema;
+import net.corda.core.schemas.PersistentState;
+import net.corda.core.serialization.CordaSerializable;
+import com.google.common.collect.ImmutableList;
+import org.hibernate.annotations.Type;
+
+import javax.annotation.Nullable;
+import javax.persistence.Column;
+import javax.persistence.Entity;
+import javax.persistence.Table;
+import java.util.UUID;
+
 @CordaSerializable
 public class CDMSchema extends MappedSchema {
     public CDMSchema() {
@@ -12,7 +23,7 @@ public class CDMSchema extends MappedSchema {
     @Table(name = "cdm_states")
     public static class CDMEntity extends PersistentState {
 
-        @Column(name = "instrumentType")
+        @Column(name = "instrument_type")
         private String instrumentType;
         @Column(name = "instrument")
         private String instrument;
@@ -24,9 +35,10 @@ public class CDMSchema extends MappedSchema {
         private String currency;
         @Column(name = "market")
         private String market;
-        @Column(name = "linearId")
+        @Column(name = "linear_id")
+        @Type(type= "uuid-char")
         private UUID linearId;
-        @Column(name = "tradeStatus")
+        @Column(name = "trade_status")
         private String tradeStatus;
 
 
@@ -84,4 +96,10 @@ public class CDMSchema extends MappedSchema {
             return linearId;
         }
     }
-}*/
+
+    @Nullable
+    @Override
+    public String getMigrationResource() {
+        return "CordaCDMCordappProject.changelog-master";
+    }
+}

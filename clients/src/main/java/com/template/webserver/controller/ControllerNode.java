@@ -1,16 +1,14 @@
 package com.template.webserver.controller;
 
 import com.google.gson.Gson;
-import com.template.flows.AcceptanceFlow;
-import com.template.flows.ModificationFlow;
-import com.template.flows.ProposalFlow;
-import com.template.flows.RejectFlow;
+import com.template.flows.*;
 import com.template.states.TradeState;
 import com.template.webserver.dto.CdmStateDTO;
 import com.template.webserver.dto.NodeInfoDTO;
 import com.template.webserver.dto.TextMessageDTO;
 import com.template.webserver.dto.ValidationJsonDTO;
 import com.template.webserver.enums.NodeNameEnum;
+import com.template.webserver.enums.NodeStatusEnum;
 import com.template.webserver.rpc.NodeRPCConnectionNode;
 import com.template.webserver.rpc.impl.*;
 import com.template.webserver.utils.ParsingUtils;
@@ -27,7 +25,9 @@ import org.json.simple.parser.ParseException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.messaging.handler.annotation.SendTo;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
@@ -35,6 +35,7 @@ import org.springframework.web.bind.annotation.*;
 import rx.Observable;
 import rx.Subscription;
 
+import java.text.MessageFormat;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.*;
@@ -162,6 +163,7 @@ public class ControllerNode {
                 });
             }
         });
+
     }
 
     private Map<NodeNameEnum, CordaRPCOps> getMapProxy() {
@@ -189,6 +191,19 @@ public class ControllerNode {
         return getMapProxy().get(nodeNameEnum);
     }
 
+    private NodeRPCConnectionNode getNodeRPCConnectionByNodeName(String nodeName) {
+        HashMap<String, NodeRPCConnectionNode> mapRpcConnection = new HashMap<>();
+            mapRpcConnection.put(rpcConnectionNodeA.getNodeName().getNodeName(), rpcConnectionNodeA);
+            mapRpcConnection.put(rpcConnectionNodeB.getNodeName().getNodeName(), rpcConnectionNodeB);
+            mapRpcConnection.put(rpcConnectionNodeC.getNodeName().getNodeName(), rpcConnectionNodeC);
+            mapRpcConnection.put(rpcConnectionNodeObserver.getNodeName().getNodeName(), rpcConnectionNodeObserver);
+            mapRpcConnection.put(rpcConnectionNodeNotary.getNodeName().getNodeName(), rpcConnectionNodeNotary);
+
+            return mapRpcConnection.get(nodeName);
+
+
+    }
+
     @CrossOrigin(origins = "*")
     @GetMapping(value = "/info", produces = APPLICATION_JSON_VALUE)
     private NodeInfoDTO info(String nodeName) {
@@ -200,30 +215,33 @@ public class ControllerNode {
         return new NodeInfoDTO(me.get(), me.isPresent());
     }
 
+
     private boolean getStatus(String nodeName) {
-        try {
+        /*try {
             getProxyByNodeName(nodeName).networkMapSnapshot().stream()
                     .map(nodeInfo -> nodeInfo.getLegalIdentities().get(0))
                     .filter(party -> party.getName().getOrganisation().equals(nodeName))
                     .findFirst();
             return true;
-        } catch (Exception exc) {
-            logger.error("getStatus of node %s error %s : ", nodeName, exc.getMessage());
-        }
+        } catch (Throwable exc) {
+            logger.error(MessageFormat.format("getStatus of node %s: ", nodeName));
 
-        return false;
+            return false;
+        }*/
+        return  getNodeRPCConnectionByNodeName(nodeName).getNodeStatus().equals(NodeStatusEnum.NODE_ACTIVE);
     }
 
     @CrossOrigin(origins = "*")
     @GetMapping(value = "/allNodesInfo", produces = APPLICATION_JSON_VALUE)
-    private List<NodeInfoDTO> allNodesInfo() {
-        return getProxyByNodeName("Observer").networkMapSnapshot().stream()
+    private ResponseEntity<List<NodeInfoDTO>> allNodesInfo() {
+        return new ResponseEntity<>(getProxyByNodeName("Observer").networkMapSnapshot().parallelStream()
                 .map(nodeInfo -> {
                     return new NodeInfoDTO(nodeInfo.getLegalIdentities().get(0),
                             getStatus(nodeInfo.getLegalIdentities().get(0).getName().getOrganisation()));
                 })
                 .sorted(Comparator.comparing(nodeInfoDTO -> nodeInfoDTO.getName()))
-                .collect(Collectors.toList());
+                .collect(Collectors.toList()),
+                HttpStatus.OK);
     }
 
     @CrossOrigin(origins = "*")
@@ -340,7 +358,7 @@ public class ControllerNode {
 
     @CrossOrigin(origins = "*")
     @PostMapping(value = "/validateCDMJson")
-    private ValidationJsonDTO validateCDMJson(
+    private ResponseEntity<ValidationJsonDTO> validateCDMJson(
             @RequestBody String cdmBase64
     ) throws ParseException {
         logger.info("Started request validateCDMJson");
@@ -352,19 +370,24 @@ public class ControllerNode {
 
             logger.info("Finished request validateCDMJson");
 
-            return new ValidationJsonDTO(true,
-                    "CDM Json is validate",
-                    (String) result.get("proposee"));
+            return new ResponseEntity<>(
+                    new ValidationJsonDTO(true,
+                        "CDM Json is validate",
+                        (String) result.get("proposee")),
+                    HttpStatus.OK
+            );
         } catch (Exception exc) {
             logger.error(exc.getMessage());
-            return new ValidationJsonDTO(false,
-                    "CDM Json is not validate");
+            return new ResponseEntity<>(
+                    new ValidationJsonDTO(false,
+                        "CDM Json is not validate"),
+                    HttpStatus.BAD_GATEWAY);
         }
     }
 
     @CrossOrigin(origins = "*")
     @PostMapping(value = "/startFlowProposal")
-    private String startFlowProposal(
+    private ResponseEntity<String> startFlowProposal(
             String nodeName,
             @RequestBody String cdmBase64
     ) throws ParseException {
@@ -406,11 +429,11 @@ public class ControllerNode {
                     cdmBase64);
         } else {
             logger.error("Not found proposee or observer party");
-            return "Not found proposee or observer party";
+            return new ResponseEntity<>("Not found proposee or observer party", HttpStatus.BAD_GATEWAY);
         }
 
         logger.info("Finished request startFlowProposal");
-        return "Finished with success";
+        return new ResponseEntity<>("Finished with success", HttpStatus.OK);
     }
 
     @CrossOrigin(origins = "*")
@@ -503,6 +526,40 @@ public class ControllerNode {
         }
 
         logger.info("Finished request startFlowRejectProposal");
+        return "Finished with success";
+    }
+
+    @CrossOrigin(origins = "*")
+    @PostMapping(value ="/startFlowCounterproposal")
+    private String startFlowCounterproposal(
+            String nodeName,
+            String quantity,
+            Double price,
+            String proposalId
+    )throws Exception {
+        logger.info("Started request startFlowCounterproposal");
+
+        // search for observer
+        Optional<Party> observerOptional = getProxyByNodeName(nodeName).networkMapSnapshot().stream()
+                .map(nodeInfo -> nodeInfo.getLegalIdentities().get(0))
+                .filter(party -> party.getName().getOrganisation().equals("Observer"))
+                .findFirst();
+
+        // generate UUID
+        UniqueIdentifier uniqueIdentifier = UniqueIdentifier.Companion.fromString(proposalId);
+
+        // if exist then start flow
+        if (observerOptional.isPresent()) {
+            getProxyByNodeName(nodeName).startFlowDynamic(CounterproposalFlow.Initiator.class,
+                    uniqueIdentifier, price, quantity, observerOptional.get())
+                    .getReturnValue().get();
+
+        } else {
+            logger.error("Not found Observer party");
+            return "Not found observer party";
+        }
+
+        logger.info("Finished request startFlowCounterproposal");
         return "Finished with success";
     }
 

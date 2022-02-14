@@ -6,7 +6,10 @@ public enum TradeStatusResponseEnum {
     ACCEPTED,
     PROPOSED,
     REJECTED,
+    REJECTED_BY_PROPOSER,
     INCOMING,
+    COUNTERPROPOSED,
+    INCOMING_COUNTERPROPOSAL,
     UNKNOWN;
 
     public static TradeStatusResponseEnum convertTradeStatusToResponse(TradeStatus tradeStatus) {

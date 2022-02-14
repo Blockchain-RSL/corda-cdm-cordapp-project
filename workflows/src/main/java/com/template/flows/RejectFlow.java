@@ -114,8 +114,10 @@ public class RejectFlow {
                     try {
                         LedgerTransaction ledgerTx = stx.toLedgerTransaction(getServiceHub(), false);
                         Party proposee = ledgerTx.inputsOfType(TradeState.class).get(0).getProposee();
-                        if(!proposee.equals(counterpartySession.getCounterparty())){
-                            throw new FlowException("Only the proposee can reject a proposal.");
+                        TradeStatus tradeStatus = ledgerTx.inputsOfType(TradeState.class).get(0).getTradeStatus();
+                        if(!proposee.equals(counterpartySession.getCounterparty()) && !tradeStatus.equals(TradeStatus.COUNTERPROPOSED) ){
+                            throw new FlowException("Only the proposee can reject a proposal or " +
+                                    "the proposeer could reject only a counterproposal");
                         }
                     } catch (SignatureException e) {
                         throw new FlowException("Check transaction failed");
